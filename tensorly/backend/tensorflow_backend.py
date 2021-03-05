@@ -42,76 +42,8 @@ class TensorflowBackend(Backend):
             return tensor
 
     @staticmethod
-    def ndim(tensor):
-        return len(tensor.get_shape()._dims)
-
-    @staticmethod
-    def shape(tensor):
-        return tuple(tensor.shape.as_list())
-
-    @staticmethod
-    def arange(start, stop=None, step=1, dtype=np.float32):
-        if stop is None:
-            stop = start
-            start = 0
-        return tf.range(start=start, limit=stop, delta=step, dtype=dtype)
-
-    def clip(self, tensor_, a_min=None, a_max=None, inplace=False):
-        if a_min is not None:
-            a_min = self.tensor(a_min, **self.context(tensor_))
-        else:
-            a_min = tf.reduce_min(input_tensor=tensor_)
-
-        if a_max is not None:
-            a_max = self.tensor(a_max, **self.context(tensor_))
-        else:
-            a_max = tf.reduce_max(input_tensor=tensor_)
-
-        return tf.clip_by_value(tensor_, clip_value_min=a_min, clip_value_max=a_max)
-
-    def moveaxis(self, tensor, source, target):
-        axes = list(range(self.ndim(tensor)))
-        if source < 0: source = axes[source]
-        if target < 0: target = axes[target]
-        try:
-            axes.pop(source)
-        except IndexError:
-            raise ValueError('Source should verify 0 <= source < tensor.ndim'
-                             'Got %d' % source)
-        try:
-            axes.insert(target, source)
-        except IndexError:
-            raise ValueError('Destination should verify 0 <= destination < tensor.ndim'
-                             'Got %d' % target)
-        return tf.transpose(a=tensor, perm=axes)
-
-    @staticmethod
-    def norm(tensor, order=2, axis=None):
-        if order == 'inf':
-            order = np.inf
-        return tf.norm(tensor=tensor, ord=order, axis=axis)
-
-    def dot(self, tensor1, tensor2):
-        return tf.tensordot(tensor1, tensor2, axes=([self.ndim(tensor1) - 1], [0]))
-
-    @staticmethod
-    def conj(x, *args, **kwargs):
-        """WARNING: IDENTITY FUNCTION (does nothing)
-
-            This backend currently does not support complex tensors
-        """
-        return x
-
-    @staticmethod
-    def solve(lhs, rhs):
-        squeeze = False
-        if rhs.ndim == 1:
-            squeeze = [-1]
-            rhs = tf.reshape(rhs, (-1, 1))
-        res = tf.linalg.solve(lhs, rhs)
-        if squeeze:
-            res = tf.squeeze(res, squeeze)
-        return res
+    def clip(tensor, a_min=None, a_max=None):
+        return tf.experimental.numpy.clip(tensor, a_min, a_max)
 
     @staticmethod
     def sort(tensor, axis, descending = False):
@@ -125,15 +57,6 @@ class TensorflowBackend(Backend):
             axis = -1
 
         return tf.sort(tensor, axis=axis, direction = direction)
-
-    def flip(self, tensor, axis=None):
-        if isinstance(axis, int):
-            axis = [axis]
-
-        if axis is None:
-            return tf.reverse(tensor, axis=[i for i in range(self.ndim(tensor))])
-        else:
-            return tf.reverse(tensor, axis=axis)
     
     def svd(self, matrix, full_matrices):
         """ Correct for the atypical return order of tf.linalg.svd. """
@@ -159,40 +82,12 @@ class TensorflowBackend(Backend):
             return tensor
 
 
-_FUN_NAMES = [
-    # source_fun, target_fun
-    (np.int32, 'int32'),
-    (np.int64, 'int64'),
-    (np.float32, 'float32'),
-    (np.float64, 'float64'),
-    (tf.ones, 'ones'),
-    (tf.zeros, 'zeros'),
-    (tf.linalg.tensor_diag, 'diag'),
-    (tf.zeros_like, 'zeros_like'),
-    (tf.eye, 'eye'),
-    (tf.reshape, 'reshape'),
-    (tf.transpose, 'transpose'),
-    (tf.where, 'where'),
-    (tf.sign, 'sign'),
-    (tf.abs, 'abs'),
-    (tf.sqrt, 'sqrt'),
-    (tf.linalg.qr, 'qr'),
-    (tf.linalg.eigh, 'eigh'),
-    (tf.argmin, 'argmin'),
-    (tf.argmax, 'argmax'),
-    (tf.stack, 'stack'),
-    (tf.identity, 'copy'),
-    (tf.concat, 'concatenate'),
-    (tf.stack, 'stack'),
-    (tf.reduce_min, 'min'),
-    (tf.reduce_max, 'max'),
-    (tf.reduce_mean, 'mean'),
-    (tf.reduce_sum, 'sum'),
-    (tf.reduce_prod, 'prod'),
-    (tf.reduce_all, 'all'),
-    (tf.einsum, 'einsum')
-    ]
-for source_fun, target_fun_name in _FUN_NAMES:
-    TensorflowBackend.register_method(target_fun_name, source_fun)
-del _FUN_NAMES
+for name in ['int64', 'int32', 'float64', 'float32', 'reshape', 'moveaxis', 'ndim',
+             'where', 'copy', 'transpose', 'arange', 'ones', 'zeros', 'flip',
+             'zeros_like', 'eye', 'kron', 'concatenate', 'max', 'min',
+             'all', 'mean', 'sum', 'prod', 'sign', 'abs', 'sqrt', 'argmin',
+             'argmax', 'stack', 'conj', 'diag', 'einsum', 'shape', 'dot']:
+    TensorflowBackend.register_method(name, getattr(tf.experimental.numpy, name))
 
+for name in ['qr', 'eigh', 'solve']:
+    TensorflowBackend.register_method(name, getattr(tf.linalg, name))

@@ -835,20 +835,20 @@ class Backend(object):
             # First choose whether to use X * X.T or X.T *X
             if dim_1 < dim_2:
                 S, U = scipy.sparse.linalg.eigsh(
-                    np.dot(matrix, matrix.T.conj()), k=n_eigenvecs, which='LM', v0=v0
+                    np.dot(matrix, self.conj(matrix.T)), k=n_eigenvecs, which='LM', v0=v0
                 )
                 S = np.where(np.abs(S) <= np.finfo(S.dtype).eps, 0, np.sqrt(S))
-                V = np.dot(matrix.T.conj(), U * np.where(np.abs(S) <= np.finfo(S.dtype).eps, 0, 1/S)[None, :])
+                V = np.dot(self.conj(matrix.T), U * np.where(np.abs(S) <= np.finfo(S.dtype).eps, 0, 1/S)[None, :])
             else:
                 S, V = scipy.sparse.linalg.eigsh(
-                    np.dot(matrix.T.conj(), matrix), k=n_eigenvecs, which='LM', v0=v0
+                    np.dot(self.conj(matrix.T), matrix), k=n_eigenvecs, which='LM', v0=v0
                 )
                 S = np.where(np.abs(S) <= np.finfo(S.dtype).eps, 0, np.sqrt(S))
                 U = np.dot(matrix, V) *  np.where(np.abs(S) <= np.finfo(S.dtype).eps, 0, 1/S)[None, :]
 
             # WARNING: here, V is still the transpose of what it should be
             U, S, V = U[:, ::-1], S[::-1], V[:, ::-1]
-            V = V.T.conj()
+            V = self.conj(V.T)
 
             if not is_numpy:
                 U = self.tensor(U, **ctx)
